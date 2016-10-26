@@ -1,20 +1,27 @@
 package com.test;
 
+import org.apache.catalina.connector.Connector;
 import org.apache.catalina.filters.RemoteIpFilter;
+import org.springframework.boot.context.embedded.EmbeddedServletContainerFactory;
+import org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainerFactory;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.converter.ByteArrayHttpMessageConverter;
-import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
 
-import java.util.List;
+import java.io.File;
 
 /**
  * Created by fantilong on 25/10/2016.
  */
 @Configuration
+@PropertySource("classpath:/application.properties")
+@EnableConfigurationProperties(WebConfiguration.TomcatSslConnectorProperties.class)
 public class WebConfiguration extends WebMvcConfigurerAdapter{
     /**
      * 添加Tomcat8提供的对应过滤器：RemoteIpFilter(将代理服务器发来的包含IP地址的请求转换成真正的用户Ip)
@@ -72,16 +79,16 @@ public class WebConfiguration extends WebMvcConfigurerAdapter{
      *
      * 添加消息转换器有三种方法
      */
-//    @Bean
-//    public ByteArrayHttpMessageConverter byteArrayHttpMessageConverter(){
-//        /**
-//         * 方法一：
-//         * @Bean 定义HttpMessageConverter是向项目中添加消息转换器的最简便的方法
-//         * Spring扫描到HttpMessageConverter的Bean之后就会自动将它添加到调用链中，
-//         * 推荐让WebConfiguration继承WebMvcConfigurerAdapter
-//         */
-//        return new ByteArrayHttpMessageConverter();
-//    }
+    @Bean
+    public ByteArrayHttpMessageConverter byteArrayHttpMessageConverter(){
+        /**
+         * 方法一：
+         * @Bean 定义HttpMessageConverter是向项目中添加消息转换器的最简便的方法
+         * Spring扫描到HttpMessageConverter的Bean之后就会自动将它添加到调用链中，
+         * 推荐让WebConfiguration继承WebMvcConfigurerAdapter
+         */
+        return new ByteArrayHttpMessageConverter();
+    }
 
 //    @Override
 //    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
@@ -105,6 +112,96 @@ public class WebConfiguration extends WebMvcConfigurerAdapter{
 //        converters.clear();
 //        converters.add(new ByteArrayHttpMessageConverter());
 //    }
+
+    @Bean
+    public EmbeddedServletContainerFactory serverletContainer(TomcatSslConnectorProperties properties){
+        TomcatEmbeddedServletContainerFactory tomcat = new TomcatEmbeddedServletContainerFactory();
+        tomcat.addAdditionalTomcatConnectors(createSslConnector(properties));
+        return tomcat;
+    }
+
+    public Connector createSslConnector(TomcatSslConnectorProperties properties){
+        Connector connector = new Connector();
+        properties.configureConnector(connector);
+        return connector;
+    }
+
+    @ConfigurationProperties(prefix = "custom.tomcat.https")
+    public static class TomcatSslConnectorProperties{
+        private Integer port;
+        private Boolean ssl = true;
+        private Boolean secure = true;
+        private String scheme = "https";
+        private File keystore;
+        private String keystorePassword;
+
+        public Integer getPort() {
+            return port;
+        }
+
+        public void setPort(Integer port) {
+            this.port = port;
+        }
+
+        public Boolean getSsl() {
+            return ssl;
+        }
+
+        public void setSsl(Boolean ssl) {
+            this.ssl = ssl;
+        }
+
+        public Boolean getSecure() {
+            return secure;
+        }
+
+        public void setSecure(Boolean secure) {
+            this.secure = secure;
+        }
+
+        public String getScheme() {
+            return scheme;
+        }
+
+        public void setScheme(String scheme) {
+            this.scheme = scheme;
+        }
+
+        public File getKeystore() {
+            return keystore;
+        }
+
+        public void setKeystore(File keystore) {
+            this.keystore = keystore;
+        }
+
+        public String getKeystorePassword() {
+            return keystorePassword;
+        }
+
+        public void setKeystorePassword(String keystorePassword) {
+            this.keystorePassword = keystorePassword;
+        }
+
+        public void configureConnector(Connector connector){
+            if (port != null) {
+                connector.setPort(port);
+            }
+            if (secure != null){
+                connector.setSecure(secure);
+            }
+            if (scheme != null) {
+                connector.setScheme(scheme);
+            }
+            if (ssl != null) {
+                connector.setProperty("SSLEnabled",ssl.toString());
+            }
+            if(keystore != null && keystore.exists()){
+                connector.setProperty("keystoreFile",keystore.getAbsolutePath());
+                connector.setProperty("keystorePass",keystorePassword);
+            }
+        }
+    }
 }
 
 
